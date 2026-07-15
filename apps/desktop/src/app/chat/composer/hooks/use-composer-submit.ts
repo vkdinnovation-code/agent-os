@@ -186,5 +186,31 @@ export function useComposerSubmit({
     })
   }
 
-  return { dispatchSubmit, steerDraft, submitDraft }
+  // Quick actions are fixed short replies such as «Проверь» and «Делай».
+  // They must never overwrite an unfinished draft. During an active turn they
+  // join the normal queue; otherwise they use the same guarded send primitive
+  // as a manual message.
+  const submitQuickMessage = (rawText: string) => {
+    const text = rawText.trim()
+
+    if (disabled || inputDisabled || !text) {
+      return
+    }
+
+    if (busy) {
+      if (activeQueueSessionKey) {
+        triggerHaptic('submit')
+        enqueueQueuedPrompt(activeQueueSessionKey, { text, attachments: [] })
+      }
+
+      return
+    }
+
+    triggerHaptic('submit')
+    resetBrowseState(sessionId)
+    dispatchSubmit(text)
+    focusInput()
+  }
+
+  return { dispatchSubmit, steerDraft, submitDraft, submitQuickMessage }
 }

@@ -60,6 +60,28 @@ interface Secondary {
 
 const secondaries = new Map<string, Secondary>()
 
+// `$sessions` only holds the currently visible profile's sidebar page. During a
+// profile switch that page is replaced, so it cannot be the sole authority for
+// whether a background profile still has live work. Track terminal gateway
+// events at the socket boundary instead: a streaming session keeps its own
+// profile socket until it completes or errors, even while another profile is
+// foregrounded.
+const liveSessionProfiles = new Map<string, string>()
+
+function noteLiveSessionEvent(profile: string, event: GatewayEvent): void {
+  const sessionId = event.session_id?.trim()
+
+  if (!sessionId) {
+    return
+  }
+
+  if (event.type === 'message.start') {
+    liveSessionProfiles.set(sessionId, normKey(profile))
+  } else if (event.type === 'message.complete' || event.type === 'error') {
+    liveSessionProfiles.delete(sessionId)
+  }
+}
+
 let activeKey = 'default'
 
 export function isActivePrimary(): boolean {
@@ -164,7 +186,10 @@ function createSecondary(profile: string): Secondary {
     wantOpen: true
   }
 
-  entry.offEvent = gateway.onEvent(event => config?.onEvent(event))
+  entry.offEvent = gateway.onEvent(event => {
+    noteLiveSessionEvent(profile, event)
+    config?.onEvent(event)
+  })
   entry.offState = gateway.onState(state => {
     reportGatewayState(profile, state)
 
@@ -262,8 +287,12 @@ export function touchSecondaryGateways(): void {
 // Close + evict secondaries whose profile is neither active nor in `keep`
 // (profiles with a running / needs-input session). Bounds cost to live work.
 export function pruneSecondaryGateways(keep: Set<string>): void {
+  // `keep` is derived from the currently rendered sidebar page; merge the
+  // socket-level liveness map so switching sidebar scope cannot orphan a stream.
+  const protectedProfiles = new Set([...keep, ...liveSessionProfiles.values()])
+
   for (const [key, entry] of [...secondaries]) {
-    if (key === activeKey || keep.has(key)) {
+    if (key === activeKey || protectedProfiles.has(key)) {
       continue
     }
 

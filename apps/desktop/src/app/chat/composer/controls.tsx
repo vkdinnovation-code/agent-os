@@ -4,7 +4,7 @@ import { KbdCombo } from '@/components/ui/kbd'
 import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
-import { AudioLines, iconSize, Layers3, Loader2, Square, SteeringWheel, Volume2, VolumeX } from '@/lib/icons'
+import { iconSize, Layers3, Loader2, Square, SteeringWheel, Volume2, VolumeX } from '@/lib/icons'
 import { formatCombo } from '@/lib/keybinds/combo'
 import { cn } from '@/lib/utils'
 
@@ -111,21 +111,12 @@ export function ComposerControls({
       )}
       <AutoSpeakButton active={autoSpeak} disabled={disabled} onToggle={onToggleAutoSpeak} />
       {showVoicePrimary ? (
-        <Tip label={c.startVoice}>
-          <Button
-            aria-label={c.startVoice}
-            className={PRIMARY_ICON_BTN}
-            disabled={disabled}
-            onClick={() => {
-              triggerHaptic('open')
-              conversation.onStart()
-            }}
-            size="icon"
-            type="button"
-          >
-            <AudioLines className={iconSize.sm} />
-          </Button>
-        </Tip>
+        <PrimaryDictationButton
+          disabled={disabled}
+          onToggle={onDictate}
+          state={state.voice}
+          status={voiceStatus}
+        />
       ) : (
         <Tip label={busy ? (busyAction === 'queue' ? c.queueMessage : c.stop) : c.send}>
           <Button
@@ -287,6 +278,51 @@ function AutoSpeakButton({ active, disabled, onToggle }: { active: boolean; disa
         variant="ghost"
       >
         {active ? <Volume2 className={iconSize.sm} /> : <VolumeX className={iconSize.sm} />}
+      </Button>
+    </Tip>
+  )
+}
+
+// The prominent empty-composer control deliberately uses push-to-talk dictation:
+// transcription becomes an editable draft and is never sent until the user hits Send.
+function PrimaryDictationButton({
+  disabled,
+  state,
+  status,
+  onToggle
+}: {
+  disabled: boolean
+  state: ChatBarState['voice']
+  status: VoiceStatus
+  onToggle: () => void
+}) {
+  const { t } = useI18n()
+  const c = t.composer
+  const active = state.active || status !== 'idle'
+  const aria =
+    status === 'recording' ? c.stopDictation : status === 'transcribing' ? c.transcribingDictation : c.voiceDictation
+
+  return (
+    <Tip label={aria}>
+      <Button
+        aria-label={aria}
+        aria-pressed={active}
+        className={cn(PRIMARY_ICON_BTN, status === 'recording' && 'bg-primary hover:bg-primary/90')}
+        disabled={disabled || !state.enabled || status === 'transcribing'}
+        onClick={() => {
+          triggerHaptic(active ? 'close' : 'open')
+          onToggle()
+        }}
+        size="icon"
+        type="button"
+      >
+        {status === 'recording' ? (
+          <Square className={cn('fill-current', iconSize.xs)} />
+        ) : status === 'transcribing' ? (
+          <Loader2 className={cn('animate-spin', iconSize.sm)} />
+        ) : (
+          <Codicon name="mic" size="0.875rem" />
+        )}
       </Button>
     </Tip>
   )

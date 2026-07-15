@@ -59,6 +59,8 @@ import type { ChatBarProps } from './types'
 import { UrlDialog } from './url-dialog'
 import { VoiceActivity, VoicePlaybackActivity } from './voice-activity'
 
+const QUICK_ACTIONS = ['Проверь', 'Делай', 'Продолжай', 'Нет'] as const
+
 export function ChatBar({
   busy,
   cwd,
@@ -201,7 +203,7 @@ export function ChatBar({
 
   // The submit engine — the orchestration seam where draft + queue meet. Owns
   // the submit decision tree, the send-with-restore primitive, and steer.
-  const { steerDraft, submitDraft } = useComposerSubmit({
+  const { steerDraft, submitDraft, submitQuickMessage } = useComposerSubmit({
     activeQueueSessionKey,
     activeQueueSessionKeyRef,
     attachments,
@@ -937,6 +939,20 @@ export function ChatBar({
               >
                 <VoiceActivity state={voiceActivityState} />
                 <VoicePlaybackActivity />
+                <div aria-label="Быстрые ответы" className="flex flex-wrap items-center gap-1" data-slot="composer-quick-actions">
+                  {QUICK_ACTIONS.map(action => (
+                    <Button
+                      className="h-6 rounded-full border-border/70 px-2.5 text-[0.68rem] text-muted-foreground hover:text-foreground"
+                      disabled={inputDisabled}
+                      key={action}
+                      onClick={() => submitQuickMessage(action)}
+                      type="button"
+                      variant="outline"
+                    >
+                      {action}
+                    </Button>
+                  ))}
+                </div>
                 {queueEdit && editingQueuedPrompt && (
                   <div className="flex items-center justify-between gap-2 rounded-lg border border-[color-mix(in_srgb,var(--dt-composer-ring)_32%,transparent)] bg-accent/18 px-2 py-1">
                     <div className="min-w-0 text-[0.7rem] text-muted-foreground/88">
